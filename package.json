@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Cross-platform desktop scaffold powered by Electron, Vite, React, TypeScript, Tailwind CSS, and shadcn/ui.",
+  "description": "A simple file encryption and decryption assistant software.",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
