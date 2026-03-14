@@ -6,6 +6,9 @@
  *   node scripts/download-age-bins.mjs            # 仅下载当前平台
  *   node scripts/download-age-bins.mjs --all      # 下载全部平台
  *   node scripts/download-age-bins.mjs --version v1.3.1  # 指定版本（默认 latest）
+ *
+ * 兼容性：Windows (zip)、macOS / Linux (tar.gz)。解压后统一按「递归查找目标二进制
+ * → 移到 outDir → 只保留目标文件」处理，不依赖归档内是否带顶层目录，避免误删。
  */
 
 import fs from 'node:fs'
@@ -55,8 +58,23 @@ for (const target of targets) {
 }
 
 console.log('\n✅ 全部下载完成。\n')
+process.exit(1)
 
 // ─── 核心函数 ────────────────────────────────────────────────────────────────
+
+/** 在 dir 下递归查找名为 binNames 的文件路径（兼容任意层级目录结构） */
+function findBinPaths(dir, binNames) {
+  const found = []
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, e.name)
+    if (e.isFile() && binNames.includes(e.name)) {
+      found.push(full)
+    } else if (e.isDirectory()) {
+      found.push(...findBinPaths(full, binNames))
+    }
+  }
+  return found
+}
 
 async function downloadTarget(target, version) {
   const url = `https://dl.filippo.io/age/${version}?for=${target.ageOs}/${target.ageArch}`
@@ -82,7 +100,7 @@ function download(url, dest) {
 
     function get(targetUrl) {
       https.get(targetUrl, (res) => {
-        if (res.statusCode === 301 || res.statusCode === 302) {
+        if ([301, 302, 307, 308].includes(res.statusCode) && res.headers.location) {
           get(res.headers.location)
           return
         }
@@ -104,32 +122,46 @@ function extract(archivePath, outDir, target) {
   const isZip = target.ext === 'zip'
 
   if (isZip) {
-    // Windows zip：使用 PowerShell 或 unzip
+    // Windows zip：PowerShell 优先（原生），失败时回退到 unzip（Git Bash 等）
+    const arc = archivePath.replace(/'/g, "''")
+    const dest = outDir.replace(/'/g, "''")
     try {
       execSync(
-        `powershell -Command "Expand-Archive -Path '${archivePath}' -DestinationPath '${outDir}' -Force"`,
+        `powershell -NoProfile -Command "Expand-Archive -LiteralPath '${arc}' -DestinationPath '${dest}' -Force"`,
         { stdio: 'pipe' }
       )
     } catch {
       execSync(`unzip -o "${archivePath}" -d "${outDir}"`, { stdio: 'pipe' })
     }
   } else {
-    // macOS / Linux tar.gz
-    execSync(`tar -xzf "${archivePath}" -C "${outDir}" --strip-components=1`, { stdio: 'pipe' })
+    // macOS / Linux tar.gz：不假设顶层结构，解压到 outDir 后由统一逻辑处理
+    execSync(`tar -xzf "${archivePath}" -C "${outDir}"`, { stdio: 'pipe' })
   }
 
-  // 先删除归档，再清理多余文件（避免归档被清理循环先删掉导致后续 rmSync ENOENT）
+  // 先删除归档，再统一整理与清理（避免归档被清理循环删掉导致 ENOENT）
   fs.rmSync(archivePath, { force: true })
 
-  // 清理 age 归档内自带的多余文件，只保留 MVP 需要的二进制
-  const keep = new Set(
-    target.ageOs === 'windows'
-      ? ['age.exe', 'age-keygen.exe', 'age-plugin-batchpass.exe', '.gitkeep']
-      : ['age', 'age-keygen', 'age-plugin-batchpass', '.gitkeep']
-  )
-  for (const f of fs.readdirSync(outDir)) {
-    if (!keep.has(f)) {
-      fs.rmSync(path.join(outDir, f), { recursive: true, force: true })
+  // 三平台统一：无论 zip/tar.gz 是「根目录即二进制」还是「带一层版本目录」，都先收集再清理，避免误删
+  const expectedBinNames = target.ageOs === 'windows'
+    ? ['age.exe', 'age-keygen.exe', 'age-plugin-batchpass.exe']
+    : ['age', 'age-keygen', 'age-plugin-batchpass']
+  const keep = new Set([...expectedBinNames, '.gitkeep'])
+
+  // 递归收集所有目标二进制路径（兼容单层目录、多层目录、根目录即文件）
+  const binPaths = findBinPaths(outDir, expectedBinNames)
+  for (const binPath of binPaths) {
+    const dir = path.dirname(binPath)
+    if (dir !== outDir) {
+      const dest = path.join(outDir, path.basename(binPath))
+      if (fs.existsSync(dest)) fs.rmSync(dest, { force: true })
+      fs.renameSync(binPath, dest)
+    }
+  }
+
+  // 只保留目标二进制与 .gitkeep，其余全部删除
+  for (const name of fs.readdirSync(outDir)) {
+    if (!keep.has(name)) {
+      fs.rmSync(path.join(outDir, name), { recursive: true, force: true })
     }
   }
 
