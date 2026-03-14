@@ -60,25 +60,30 @@
       "dist-electron/**/*",
       "package.json"
     ],
-    "extraResources": [
-      {
-        "from": "resources/bin/${os}/${arch}",
-        "to": "bin",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
     "mac": {
       "target": [
         "dmg",
         "zip"
       ],
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "extraResources": [
+        {
+          "from": "resources/bin/darwin/${arch}",
+          "to": "bin",
+          "filter": ["**/*"]
+        }
+      ]
     },
     "win": {
       "target": [
         "nsis"
+      ],
+      "extraResources": [
+        {
+          "from": "resources/bin/win32/x64",
+          "to": "bin",
+          "filter": ["**/*"]
+        }
       ]
     },
     "linux": {
@@ -86,7 +91,14 @@
         "AppImage",
         "deb"
       ],
-      "category": "Utility"
+      "category": "Utility",
+      "extraResources": [
+        {
+          "from": "resources/bin/linux/x64",
+          "to": "bin",
+          "filter": ["**/*"]
+        }
+      ]
     }
   }
 }
