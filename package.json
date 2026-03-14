@@ -53,7 +53,8 @@
     "appId": "com.tagecode.edassistant",
     "productName": "ED Assistant",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "asar": true,
     "files": [
