@@ -15,11 +15,13 @@ release
 *.local
 
 # age 预编译二进制（通过 scripts/download-age-bins.mjs 下载，不入库）
-resources/bin/darwin/
-resources/bin/win32/
-resources/bin/linux/
-# 保留目录结构占位文件
-!resources/bin/**/.gitkeep
+# 只忽略二进制与归档，保留各目录下的 .gitkeep 以便目录结构入仓
+resources/bin/**/age
+resources/bin/**/age-keygen
+resources/bin/**/age-plugin-batchpass
+resources/bin/**/*.exe
+resources/bin/**/*.tar.gz
+resources/bin/**/*.zip
 
 # Editor directories and files
 .vscode/*
