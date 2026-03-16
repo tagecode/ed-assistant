@@ -112,7 +112,7 @@ export function DecryptPage() {
     <div className="space-y-6">
       <PageHeader
         title="文件解密"
-        description="对 `.age` 文件进行还原，MVP 支持口令模式与 age 私钥文件模式。"
+        description="对 `.age` 文件进行还原，支持口令模式与 age 私钥文件模式。"
       />
 
       {!isDesktop ? (

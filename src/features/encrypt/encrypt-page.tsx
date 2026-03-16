@@ -144,7 +144,7 @@ export function EncryptPage() {
     <div className="space-y-6">
       <PageHeader
         title="文件加密"
-        description="使用口令或 age 公钥对文件进行加密。MVP 版本支持口令模式与单收件人/多行公钥输入。"
+        description="使用口令或 age 公钥对文件进行加密，支持口令模式与多行公钥输入。"
       />
 
       {!isDesktop ? (
@@ -298,7 +298,7 @@ export function EncryptPage() {
                     className="min-h-36 font-mono text-xs"
                   />
                   <p className="text-xs leading-5 text-muted-foreground">
-                    MVP 暂仅实现 age 原生公钥模式；SSH 和多收件人管理将在后续版本补充。
+                    当前支持 age 原生公钥（age1...）；SSH 密钥与多收件人管理将在后续版本补充。
                   </p>
                 </div>
               )}
