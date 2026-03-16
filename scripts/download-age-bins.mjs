@@ -58,7 +58,7 @@ for (const target of targets) {
 }
 
 console.log('\n✅ 全部下载完成。\n')
-process.exit(1)
+process.exit(0)
 
 // ─── 核心函数 ────────────────────────────────────────────────────────────────
 
