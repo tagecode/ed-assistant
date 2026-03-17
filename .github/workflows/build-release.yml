@@ -59,9 +59,7 @@ jobs:
 
     env:
       # CI 环境使用官方下载源，速度更稳定
-      # electron_mirror        — Electron 运行时本体
       # electron_builder_binaries_mirror — electron-builder 打包工具（NSIS、7zip、fpm 等）
-      electron_mirror: https://github.com/electron/electron/releases/download/v
       electron_builder_binaries_mirror: https://github.com/electron-userland/electron-builder-binaries/releases/download/
       # 跳过 macOS 代码签名（未配置证书时避免打包失败）
       CSC_IDENTITY_AUTO_DISCOVERY: false
