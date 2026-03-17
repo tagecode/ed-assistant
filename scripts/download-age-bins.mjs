@@ -145,26 +145,36 @@ function extract(archivePath, outDir, target) {
   const expectedBinNames = target.ageOs === 'windows'
     ? ['age.exe', 'age-keygen.exe', 'age-plugin-batchpass.exe']
     : ['age', 'age-keygen', 'age-plugin-batchpass']
-  const keep = new Set([...expectedBinNames, '.gitkeep'])
 
-  // 递归收集所有目标二进制路径（兼容单层目录、多层目录、根目录即文件）
+  // 递归收集所有目标二进制路径（兼容单层目录、多层目录、根目录即文件）。
+  // 为避免 outDir/age/age 这类「目录与二进制同名」导致的自删/ENOENT，
+  // 采用“两阶段搬运”：先全部挪到 staging，再清理 outDir，最后再搬回根目录。
   const binPaths = findBinPaths(outDir, expectedBinNames)
+  const stageName = `.__stage_${Date.now()}`
+  const stageDir = path.join(outDir, stageName)
+  fs.mkdirSync(stageDir, { recursive: true })
+
+  // 先把找到的二进制统一挪到 staging（同名覆盖）
   for (const binPath of binPaths) {
-    const dir = path.dirname(binPath)
-    if (dir !== outDir) {
-      const dest = path.join(outDir, path.basename(binPath))
-      // 目标可能是旧版本残留的同名目录（例如误解压/手动创建），需要递归删除
-      if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true, force: true })
-      fs.renameSync(binPath, dest)
-    }
+    if (!fs.existsSync(binPath)) continue
+    const staged = path.join(stageDir, path.basename(binPath))
+    if (fs.existsSync(staged)) fs.rmSync(staged, { recursive: true, force: true })
+    fs.renameSync(binPath, staged)
   }
 
-  // 只保留目标二进制与 .gitkeep，其余全部删除
+  // 清空 outDir（保留 .gitkeep 与 staging 目录本身）
   for (const name of fs.readdirSync(outDir)) {
-    if (!keep.has(name)) {
-      fs.rmSync(path.join(outDir, name), { recursive: true, force: true })
-    }
+    if (name === '.gitkeep' || name === stageName) continue
+    fs.rmSync(path.join(outDir, name), { recursive: true, force: true })
   }
+
+  // 再从 staging 搬回 outDir 根目录
+  for (const name of fs.readdirSync(stageDir)) {
+    const dest = path.join(outDir, name)
+    if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true, force: true })
+    fs.renameSync(path.join(stageDir, name), dest)
+  }
+  fs.rmSync(stageDir, { recursive: true, force: true })
 
   // 确保 Unix 二进制有执行权限
   if (target.ageOs !== 'windows') {
