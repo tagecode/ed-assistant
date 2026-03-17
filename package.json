@@ -57,6 +57,10 @@
       "buildResources": "build"
     },
     "asar": true,
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
