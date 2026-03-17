@@ -85,15 +85,15 @@ jobs:
       # ── 打包 ──
       - name: Build & Package (macOS)
         if: matrix.platform == 'mac'
-        run: npm run dist:mac -- --${{ matrix.arch }}
+        run: npm run dist:mac -- --${{ matrix.arch }} --publish never
 
       - name: Build & Package (Windows)
         if: matrix.platform == 'win'
-        run: npm run dist:win -- --${{ matrix.arch }}
+        run: npm run dist:win -- --${{ matrix.arch }} --publish never
 
       - name: Build & Package (Linux)
         if: matrix.platform == 'linux'
-        run: npm run dist:linux -- --${{ matrix.arch }}
+        run: npm run dist:linux -- --${{ matrix.arch }} --publish never
 
       # ── 生成 SHA256 校验文件（macOS / Linux）──
       - name: Generate SHA256SUMS (Unix)
