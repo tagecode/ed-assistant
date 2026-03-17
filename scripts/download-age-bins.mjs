@@ -153,7 +153,8 @@ function extract(archivePath, outDir, target) {
     const dir = path.dirname(binPath)
     if (dir !== outDir) {
       const dest = path.join(outDir, path.basename(binPath))
-      if (fs.existsSync(dest)) fs.rmSync(dest, { force: true })
+      // 目标可能是旧版本残留的同名目录（例如误解压/手动创建），需要递归删除
+      if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true, force: true })
       fs.renameSync(binPath, dest)
     }
   }
