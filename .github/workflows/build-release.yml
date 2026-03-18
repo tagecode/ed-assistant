@@ -82,47 +82,55 @@ jobs:
       - name: Ensure age binaries exist
         shell: bash
         run: |
-          missing_targets=()
+          target=""
+          required=()
 
-          check_target() {
-            local target="$1"
-            shift
-            for f in "$@"; do
-              if [ ! -f "$f" ]; then
-                echo "Missing age binary: $f"
-                missing_targets+=("$target")
-                return
-              fi
-            done
-          }
-
-          check_target "darwin/arm64" \
-            "resources/bin/darwin/arm64/age" \
-            "resources/bin/darwin/arm64/age-keygen" \
-            "resources/bin/darwin/arm64/age-plugin-batchpass"
-
-          check_target "darwin/x64" \
-            "resources/bin/darwin/x64/age" \
-            "resources/bin/darwin/x64/age-keygen" \
-            "resources/bin/darwin/x64/age-plugin-batchpass"
-
-          check_target "win32/x64" \
-            "resources/bin/win32/x64/age.exe" \
-            "resources/bin/win32/x64/age-keygen.exe" \
-            "resources/bin/win32/x64/age-plugin-batchpass.exe"
-
-          check_target "linux/x64" \
-            "resources/bin/linux/x64/age" \
-            "resources/bin/linux/x64/age-keygen" \
-            "resources/bin/linux/x64/age-plugin-batchpass"
-
-          if [ "${#missing_targets[@]}" -gt 0 ]; then
-            targets_csv=$(printf '%s,' "${missing_targets[@]}")
-            targets_csv="${targets_csv%,}"
-            echo "Downloading missing targets only: ${targets_csv}"
-            node scripts/download-age-bins.mjs --targets "${targets_csv}"
+          if [ "${{ matrix.platform }}" = "mac" ] && [ "${{ matrix.arch }}" = "arm64" ]; then
+            target="darwin/arm64"
+            required=(
+              "resources/bin/darwin/arm64/age"
+              "resources/bin/darwin/arm64/age-keygen"
+              "resources/bin/darwin/arm64/age-plugin-batchpass"
+            )
+          elif [ "${{ matrix.platform }}" = "mac" ] && [ "${{ matrix.arch }}" = "x64" ]; then
+            target="darwin/x64"
+            required=(
+              "resources/bin/darwin/x64/age"
+              "resources/bin/darwin/x64/age-keygen"
+              "resources/bin/darwin/x64/age-plugin-batchpass"
+            )
+          elif [ "${{ matrix.platform }}" = "win" ] && [ "${{ matrix.arch }}" = "x64" ]; then
+            target="win32/x64"
+            required=(
+              "resources/bin/win32/x64/age.exe"
+              "resources/bin/win32/x64/age-keygen.exe"
+              "resources/bin/win32/x64/age-plugin-batchpass.exe"
+            )
+          elif [ "${{ matrix.platform }}" = "linux" ] && [ "${{ matrix.arch }}" = "x64" ]; then
+            target="linux/x64"
+            required=(
+              "resources/bin/linux/x64/age"
+              "resources/bin/linux/x64/age-keygen"
+              "resources/bin/linux/x64/age-plugin-batchpass"
+            )
           else
-            echo "All committed age binaries are present, skipping download."
+            echo "Unsupported matrix target: platform=${{ matrix.platform }}, arch=${{ matrix.arch }}"
+            exit 1
+          fi
+
+          missing=0
+          for f in "${required[@]}"; do
+            if [ ! -f "$f" ]; then
+              echo "Missing age binary: $f"
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -eq 1 ]; then
+            echo "Downloading missing target only: ${target}"
+            node scripts/download-age-bins.mjs --targets "${target}"
+          else
+            echo "Age binaries for ${target} are present, skipping download."
           fi
 
       # ── 打包 ──
