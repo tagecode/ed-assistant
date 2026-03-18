@@ -14,12 +14,7 @@ dist-ssr
 release
 *.local
 
-# age 预编译二进制（通过 scripts/download-age-bins.mjs 下载，不入库）
-# 只忽略二进制与归档，保留各目录下的 .gitkeep 以便目录结构入仓
-resources/bin/**/age
-resources/bin/**/age-keygen
-resources/bin/**/age-plugin-batchpass
-resources/bin/**/*.exe
+# age 下载归档不入库；预编译二进制本身提交到仓库以固定版本
 resources/bin/**/*.tar.gz
 resources/bin/**/*.zip
 

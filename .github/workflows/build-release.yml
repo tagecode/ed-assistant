@@ -78,9 +78,52 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 下载 age 预编译二进制（全平台）
-      - name: Download age binaries (all platforms)
-        run: node scripts/download-age-bins.mjs --all
+      # 优先使用仓库中已提交的 age 预编译二进制；缺失时再自动下载 latest
+      - name: Ensure age binaries exist
+        shell: bash
+        run: |
+          missing_targets=()
+
+          check_target() {
+            local target="$1"
+            shift
+            for f in "$@"; do
+              if [ ! -f "$f" ]; then
+                echo "Missing age binary: $f"
+                missing_targets+=("$target")
+                return
+              fi
+            done
+          }
+
+          check_target "darwin/arm64" \
+            "resources/bin/darwin/arm64/age" \
+            "resources/bin/darwin/arm64/age-keygen" \
+            "resources/bin/darwin/arm64/age-plugin-batchpass"
+
+          check_target "darwin/x64" \
+            "resources/bin/darwin/x64/age" \
+            "resources/bin/darwin/x64/age-keygen" \
+            "resources/bin/darwin/x64/age-plugin-batchpass"
+
+          check_target "win32/x64" \
+            "resources/bin/win32/x64/age.exe" \
+            "resources/bin/win32/x64/age-keygen.exe" \
+            "resources/bin/win32/x64/age-plugin-batchpass.exe"
+
+          check_target "linux/x64" \
+            "resources/bin/linux/x64/age" \
+            "resources/bin/linux/x64/age-keygen" \
+            "resources/bin/linux/x64/age-plugin-batchpass"
+
+          if [ "${#missing_targets[@]}" -gt 0 ]; then
+            targets_csv=$(printf '%s,' "${missing_targets[@]}")
+            targets_csv="${targets_csv%,}"
+            echo "Downloading missing targets only: ${targets_csv}"
+            node scripts/download-age-bins.mjs --targets "${targets_csv}"
+          else
+            echo "All committed age binaries are present, skipping download."
+          fi
 
       # ── 打包 ──
       - name: Build & Package (macOS)
@@ -118,7 +161,7 @@ jobs:
         shell: pwsh
         run: |
           $outFile = "release\SHA256SUMS.txt"
-          Get-ChildItem -Path release -Recurse -Depth 2 -Include "*.exe" |
+          Get-ChildItem -Path release -File -Filter "*.exe" |
             Sort-Object Name |
             ForEach-Object {
               $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
@@ -134,12 +177,12 @@ jobs:
           name: dist-${{ matrix.label }}
           retention-days: 3
           path: |
-            release/**/*.dmg
-            release/**/*.zip
-            release/**/*.exe
-            release/**/*.AppImage
-            release/**/*.deb
-            release/**/SHA256SUMS.txt
+            release/*.dmg
+            release/*.zip
+            release/*.exe
+            release/*.AppImage
+            release/*.deb
+            release/SHA256SUMS.txt
 
   # ─────────────────────────── 发布 Release ───────────────────────────
   release:
@@ -160,16 +203,12 @@ jobs:
         run: |
           mkdir -p dist-upload
           # 收集所有安装包到同一目录
-          find artifacts -type f \( \
-            -name "*.dmg" -o \
-            -name "*.zip" -o \
-            -name "*.exe" -o \
-            -name "*.AppImage" -o \
-            -name "*.deb" \
-          \) -exec cp {} dist-upload/ \;
+          shopt -s nullglob
+          for f in artifacts/*/release/*.dmg artifacts/*/release/*.zip artifacts/*/release/*.exe artifacts/*/release/*.AppImage artifacts/*/release/*.deb; do
+            cp "$f" dist-upload/
+          done
           # 合并并去重 SHA256SUMS
-          find artifacts -name "SHA256SUMS.txt" -exec cat {} \; \
-            | sort -u > dist-upload/SHA256SUMS.txt
+          cat artifacts/*/release/SHA256SUMS.txt | sort -u > dist-upload/SHA256SUMS.txt
           echo "=== 待发布文件 ==="
           ls -lh dist-upload/
           echo ""

@@ -5,6 +5,7 @@
  * 用法：
  *   node scripts/download-age-bins.mjs            # 仅下载当前平台
  *   node scripts/download-age-bins.mjs --all      # 下载全部平台
+ *   node scripts/download-age-bins.mjs --targets darwin/arm64,linux/x64
  *   node scripts/download-age-bins.mjs --version v1.3.1  # 指定版本（默认 latest）
  *
  * 兼容性：Windows (zip)、macOS / Linux (tar.gz)。解压后统一按「递归查找目标二进制
@@ -40,13 +41,15 @@ function currentTarget() {
 
 const args = process.argv.slice(2)
 const downloadAll = args.includes('--all')
+const targetsIdx = args.indexOf('--targets')
 const versionIdx = args.indexOf('--version')
 const version = versionIdx !== -1 ? args[versionIdx + 1] : 'latest'
+const selectedTargets = targetsIdx !== -1 ? parseTargetList(args[targetsIdx + 1]) : null
 
-const targets = downloadAll ? TARGETS : [currentTarget()].filter(Boolean)
+const targets = selectedTargets ?? (downloadAll ? TARGETS : [currentTarget()].filter(Boolean))
 
 if (targets.length === 0) {
-  console.error('❌ 无法识别当前平台，请使用 --all 下载全部。')
+  console.error('❌ 无可下载目标，请使用 --all 或 --targets 指定目标平台。')
   process.exit(1)
 }
 
@@ -74,6 +77,45 @@ function findBinPaths(dir, binNames) {
     }
   }
   return found
+}
+
+function parseTargetList(raw) {
+  if (!raw) {
+    console.error('❌ --targets 需要传入目标列表，例如 --targets darwin/arm64,linux/x64')
+    process.exit(1)
+  }
+
+  const names = raw.split(',').map(s => s.trim()).filter(Boolean)
+  const resolved = []
+  const invalid = []
+
+  for (const name of names) {
+    const target = TARGETS.find(t => [t.localDir, `${t.ageOs}/${t.ageArch}`].includes(name))
+    if (target) {
+      resolved.push(target)
+    } else {
+      invalid.push(name)
+    }
+  }
+
+  if (invalid.length > 0) {
+    const supported = TARGETS.flatMap(t => [t.localDir, `${t.ageOs}/${t.ageArch}`]).join(', ')
+    console.error(`❌ 不支持的目标平台：${invalid.join(', ')}`)
+    console.error(`   可用值：${supported}`)
+    process.exit(1)
+  }
+
+  return dedupeTargets(resolved)
+}
+
+function dedupeTargets(targets) {
+  const seen = new Set()
+  return targets.filter((target) => {
+    const key = `${target.ageOs}/${target.ageArch}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 async function downloadTarget(target, version) {
