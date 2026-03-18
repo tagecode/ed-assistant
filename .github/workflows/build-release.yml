@@ -215,8 +215,16 @@ jobs:
           for f in artifacts/*/release/*.dmg artifacts/*/release/*.zip artifacts/*/release/*.exe artifacts/*/release/*.AppImage artifacts/*/release/*.deb; do
             cp "$f" dist-upload/
           done
-          # 合并并去重 SHA256SUMS
-          cat artifacts/*/release/SHA256SUMS.txt | sort -u > dist-upload/SHA256SUMS.txt
+
+          # 重新基于实际安装包文件计算 SHA256，避免出现空的 SHA256SUMS.txt
+          cd dist-upload
+          rm -f SHA256SUMS.txt
+          # sha256sum 在有匹配文件时才会生成内容；nullglob 确保没匹配也不会误报
+          sha256sum ./*.dmg ./*.zip ./*.exe ./*.AppImage ./*.deb 2>/dev/null > SHA256SUMS.txt || true
+          if [ ! -s SHA256SUMS.txt ]; then
+            echo "SHA256SUMS.txt is empty (no installers found)."
+            exit 1
+          fi
           echo "=== 待发布文件 ==="
           ls -lh dist-upload/
           echo ""
