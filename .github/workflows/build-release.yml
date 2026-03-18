@@ -226,10 +226,10 @@ jobs:
             exit 1
           fi
           echo "=== 待发布文件 ==="
-          ls -lh dist-upload/
+          ls -lh .
           echo ""
           echo "=== SHA256SUMS ==="
-          cat dist-upload/SHA256SUMS.txt
+          cat SHA256SUMS.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
