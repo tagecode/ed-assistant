@@ -61,6 +61,8 @@ jobs:
       # CI 环境使用官方下载源，速度更稳定
       # electron_builder_binaries_mirror — electron-builder 打包工具（NSIS、7zip、fpm 等）
       electron_builder_binaries_mirror: https://github.com/electron-userland/electron-builder-binaries/releases/download/
+      # 强制让 JavaScript actions 使用 Node.js 24（避免 Node 20 弃用警告）
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       # 跳过 macOS 代码签名（未配置证书时避免打包失败）
       CSC_IDENTITY_AUTO_DISCOVERY: false
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -142,6 +144,19 @@ jobs:
         if: matrix.platform == 'win'
         run: npm run dist:win -- --${{ matrix.arch }} --publish never
 
+      - name: Cleanup internal age exes (avoid artifact confusion)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $names = @('age.exe', 'age-keygen.exe', 'age-plugin-batchpass.exe')
+          foreach ($n in $names) {
+            $p = Join-Path 'release' $n
+            if (Test-Path $p) {
+              Write-Host "Removing top-level internal binary from release/: $n"
+              Remove-Item $p -Force
+            }
+          }
+
       - name: Build & Package (Linux)
         if: matrix.platform == 'linux'
         run: npm run dist:linux -- --${{ matrix.arch }} --publish never
@@ -197,6 +212,9 @@ jobs:
     name: Publish GitHub Release
     needs: build
     runs-on: ubuntu-latest
+    env:
+      # 强制让 JavaScript actions 使用 Node.js 24（避免 Node 20 弃用警告）
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     # 仅在推送 v* 标签时才发布 Release；
     # workflow_dispatch 手动触发（通常在分支上测试打包）时跳过此 Job
     if: always() && needs.build.result == 'success' && startsWith(github.ref, 'refs/tags/')
@@ -213,6 +231,12 @@ jobs:
           # 收集所有安装包到同一目录
           shopt -s nullglob
           for f in artifacts/*/release/*.dmg artifacts/*/release/*.zip artifacts/*/release/*.exe artifacts/*/release/*.AppImage artifacts/*/release/*.deb; do
+            base="$(basename "$f")"
+            # 防止把“应用内部资源里的 age.exe”等误当成安装包附件上传
+            if [[ "$base" == "age.exe" || "$base" == "age-keygen.exe" || "$base" == "age-plugin-batchpass.exe" ]]; then
+              echo "Skip internal binary in Release: $base"
+              continue
+            fi
             cp "$f" dist-upload/
           done
 
