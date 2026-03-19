@@ -36,7 +36,7 @@ function createMainWindow() {
     minWidth: 1040,
     minHeight: 720,
     title: 'ED Assistant',
-    autoHideMenuBar: true,
+    autoHideMenuBar: false,
     show: false,
     backgroundColor: '#050815',
     webPreferences: {
