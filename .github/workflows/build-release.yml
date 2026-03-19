@@ -148,12 +148,22 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $names = @('age.exe', 'age-keygen.exe', 'age-plugin-batchpass.exe')
-          foreach ($n in $names) {
-            $p = Join-Path 'release' $n
-            if (Test-Path $p) {
-              Write-Host "Removing top-level internal binary from release/: $n"
-              Remove-Item $p -Force
+          # 1) 删除顶层 internal age 二进制（防止被当成安装包附件）
+          $internalPattern = 'age*.exe'
+          Get-ChildItem -Path 'release' -File -Filter $internalPattern | ForEach-Object {
+            Write-Host "Removing top-level internal binary from release/: $($_.Name)"
+            Remove-Item $_.FullName -Force
+          }
+
+          # 2) 若出现重复安装器（例如带空格的文件名版本），保留“不含空格”的那个
+          $setupExes = Get-ChildItem -Path 'release' -File -Filter '*Setup*.exe'
+          if ($setupExes.Count -gt 1) {
+            $withSpaces = $setupExes | Where-Object { $_.Name -match ' ' }
+            if ($withSpaces.Count -gt 0) {
+              foreach ($e in $withSpaces) {
+                Write-Host "Removing duplicate setup exe with space in name: $($e.Name)"
+                Remove-Item $e.FullName -Force
+              }
             }
           }
 
@@ -184,7 +194,7 @@ jobs:
         shell: pwsh
         run: |
           $outFile = "release\SHA256SUMS.txt"
-          Get-ChildItem -Path release -File -Filter "*.exe" |
+          Get-ChildItem -Path release -File -Filter "*Setup*.exe" |
             Sort-Object Name |
             ForEach-Object {
               $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
@@ -202,7 +212,7 @@ jobs:
           path: |
             release/*.dmg
             release/*.zip
-            release/*.exe
+            release/*Setup*.exe
             release/*.AppImage
             release/*.deb
             release/SHA256SUMS.txt
@@ -230,10 +240,11 @@ jobs:
           mkdir -p dist-upload
           # 收集所有安装包到同一目录
           shopt -s nullglob
-          for f in artifacts/*/release/*.dmg artifacts/*/release/*.zip artifacts/*/release/*.exe artifacts/*/release/*.AppImage artifacts/*/release/*.deb; do
+          shopt -s nocasematch
+          for f in artifacts/*/release/*.dmg artifacts/*/release/*.zip artifacts/*/release/*Setup*.exe artifacts/*/release/*.AppImage artifacts/*/release/*.deb; do
             base="$(basename "$f")"
             # 防止把“应用内部资源里的 age.exe”等误当成安装包附件上传
-            if [[ "$base" == "age.exe" || "$base" == "age-keygen.exe" || "$base" == "age-plugin-batchpass.exe" ]]; then
+            if [[ "$base" == age*.exe ]]; then
               echo "Skip internal binary in Release: $base"
               continue
             fi
@@ -244,7 +255,7 @@ jobs:
           cd dist-upload
           rm -f SHA256SUMS.txt
           # sha256sum 在有匹配文件时才会生成内容；nullglob 确保没匹配也不会误报
-          sha256sum ./*.dmg ./*.zip ./*.exe ./*.AppImage ./*.deb 2>/dev/null > SHA256SUMS.txt || true
+          sha256sum ./*.dmg ./*.zip ./*Setup*.exe ./*.AppImage ./*.deb 2>/dev/null > SHA256SUMS.txt || true
           if [ ! -s SHA256SUMS.txt ]; then
             echo "SHA256SUMS.txt is empty (no installers found)."
             exit 1
