@@ -159,7 +159,7 @@ jobs:
 
           # 2) 若出现重复安装器（例如带空格的文件名版本），保留“不含空格”的那个
           $installerExes = Get-ChildItem -Path 'release' -File -Filter '*.exe' | Where-Object {
-            $_.Name -notlike 'age*.exe' -and $_.Name -notieq 'elevate.exe'
+            $_.Name -notlike 'age*.exe' -and $_.Name -ine 'elevate.exe'
           }
           if ($installerExes.Count -gt 1) {
             $withSpaces = $installerExes | Where-Object { $_.Name -match ' ' }
@@ -199,7 +199,7 @@ jobs:
         run: |
           $outFile = "release\SHA256SUMS.txt"
           $installerExes = Get-ChildItem -Path release -File -Filter "*.exe" | Where-Object {
-            $_.Name -notlike 'age*.exe' -and $_.Name -notieq 'elevate.exe'
+            $_.Name -notlike 'age*.exe' -and $_.Name -ine 'elevate.exe'
           }
           if ($installerExes.Count -eq 0) {
             Write-Error "No Windows installer exe found in release/"
