@@ -65,7 +65,7 @@ jobs:
       # 强制让 JavaScript actions 使用 Node.js 24（避免 Node 20 弃用警告）
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       # 跳过 macOS 代码签名（未配置证书时避免打包失败）
-      CSC_IDENTITY_AUTO_DISCOVERY: false
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
@@ -266,6 +266,32 @@ jobs:
           echo ""
           echo "=== SHA256SUMS ==="
           cat SHA256SUMS.txt
+
+      - name: Cleanup release assets by whitelist
+        shell: bash
+        run: |
+          cd dist-upload
+          shopt -s nullglob nocasematch
+          removed=0
+
+          for f in *; do
+            case "$f" in
+              *.dmg|*.zip|*Setup*.exe|*.AppImage|*.deb|SHA256SUMS.txt)
+                ;;
+              *)
+                echo "Remove unexpected release asset: $f"
+                rm -f -- "$f"
+                removed=1
+                ;;
+            esac
+          done
+
+          if [ "$removed" -ne 0 ]; then
+            echo "Unexpected assets were removed. Remaining files:"
+            ls -lh .
+          else
+            echo "No unexpected assets found."
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

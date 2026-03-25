@@ -51,7 +51,8 @@
   },
   "build": {
     "appId": "com.tagecode.edassistant",
-    "productName": "ED Assistant",
+    "productName": "ED-Assistant",
+    "artifactName": "${productName}-v${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "release",
       "buildResources": "build"
