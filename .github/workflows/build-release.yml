@@ -70,10 +70,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
@@ -149,17 +149,20 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          # 1) 删除顶层 internal age 二进制（防止被当成安装包附件）
-          $internalPattern = 'age*.exe'
-          Get-ChildItem -Path 'release' -File -Filter $internalPattern | ForEach-Object {
-            Write-Host "Removing top-level internal binary from release/: $($_.Name)"
-            Remove-Item $_.FullName -Force
+          # 1) 删除顶层内部辅助二进制（防止被误当成安装包）
+          foreach ($pattern in @('age*.exe', 'elevate.exe')) {
+            Get-ChildItem -Path 'release' -File -Filter $pattern | ForEach-Object {
+              Write-Host "Removing top-level internal binary from release/: $($_.Name)"
+              Remove-Item $_.FullName -Force
+            }
           }
 
           # 2) 若出现重复安装器（例如带空格的文件名版本），保留“不含空格”的那个
-          $setupExes = Get-ChildItem -Path 'release' -File -Filter '*Setup*.exe'
-          if ($setupExes.Count -gt 1) {
-            $withSpaces = $setupExes | Where-Object { $_.Name -match ' ' }
+          $installerExes = Get-ChildItem -Path 'release' -File -Filter '*.exe' | Where-Object {
+            $_.Name -notlike 'age*.exe' -and $_.Name -notieq 'elevate.exe'
+          }
+          if ($installerExes.Count -gt 1) {
+            $withSpaces = $installerExes | Where-Object { $_.Name -match ' ' }
             if ($withSpaces.Count -gt 0) {
               foreach ($e in $withSpaces) {
                 Write-Host "Removing duplicate setup exe with space in name: $($e.Name)"
@@ -195,7 +198,13 @@ jobs:
         shell: pwsh
         run: |
           $outFile = "release\SHA256SUMS.txt"
-          Get-ChildItem -Path release -File -Filter "*Setup*.exe" |
+          $installerExes = Get-ChildItem -Path release -File -Filter "*.exe" | Where-Object {
+            $_.Name -notlike 'age*.exe' -and $_.Name -notieq 'elevate.exe'
+          }
+          if ($installerExes.Count -eq 0) {
+            Write-Error "No Windows installer exe found in release/"
+          }
+          $installerExes |
             Sort-Object Name |
             ForEach-Object {
               $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
@@ -206,14 +215,16 @@ jobs:
 
       # ── 上传产物 ──
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: dist-${{ matrix.label }}
           retention-days: 3
           path: |
             release/*.dmg
             release/*.zip
-            release/*Setup*.exe
+            release/*.exe
+            !release/age*.exe
+            !release/elevate.exe
             release/*.AppImage
             release/*.deb
             release/SHA256SUMS.txt
@@ -232,7 +243,7 @@ jobs:
 
     steps:
       - name: Download all build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: artifacts
 
@@ -242,10 +253,10 @@ jobs:
           # 收集所有安装包到同一目录
           shopt -s nullglob
           shopt -s nocasematch
-          for f in artifacts/*/release/*.dmg artifacts/*/release/*.zip artifacts/*/release/*Setup*.exe artifacts/*/release/*.AppImage artifacts/*/release/*.deb; do
+          for f in artifacts/*/release/*.dmg artifacts/*/release/*.zip artifacts/*/release/*.exe artifacts/*/release/*.AppImage artifacts/*/release/*.deb; do
             base="$(basename "$f")"
             # 防止把“应用内部资源里的 age.exe”等误当成安装包附件上传
-            if [[ "$base" == age*.exe ]]; then
+            if [[ "$base" == age*.exe || "$base" == "elevate.exe" ]]; then
               echo "Skip internal binary in Release: $base"
               continue
             fi
@@ -256,7 +267,7 @@ jobs:
           cd dist-upload
           rm -f SHA256SUMS.txt
           # sha256sum 在有匹配文件时才会生成内容；nullglob 确保没匹配也不会误报
-          sha256sum ./*.dmg ./*.zip ./*Setup*.exe ./*.AppImage ./*.deb 2>/dev/null > SHA256SUMS.txt || true
+          sha256sum ./*.dmg ./*.zip ./*.exe ./*.AppImage ./*.deb 2>/dev/null > SHA256SUMS.txt || true
           if [ ! -s SHA256SUMS.txt ]; then
             echo "SHA256SUMS.txt is empty (no installers found)."
             exit 1
@@ -276,7 +287,7 @@ jobs:
 
           for f in *; do
             case "$f" in
-              *.dmg|*.zip|*Setup*.exe|*.AppImage|*.deb|SHA256SUMS.txt)
+              *.dmg|*.zip|*.exe|*.AppImage|*.deb|SHA256SUMS.txt)
                 ;;
               *)
                 echo "Remove unexpected release asset: $f"
