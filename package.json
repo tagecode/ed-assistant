@@ -68,6 +68,7 @@
       "package.json"
     ],
     "mac": {
+      "artifactName": "${productName}-v${version}-${os}-${arch}.${ext}",
       "target": [
         "dmg",
         "zip"
@@ -82,6 +83,7 @@
       ]
     },
     "win": {
+      "artifactName": "${productName}-v${version}-${os}-${arch}.${ext}",
       "target": [
         "nsis"
       ],
@@ -94,6 +96,7 @@
       ]
     },
     "linux": {
+      "artifactName": "${productName}-v${version}-${os}-${arch}.${ext}",
       "target": [
         "AppImage",
         "deb"

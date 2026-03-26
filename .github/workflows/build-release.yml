@@ -304,6 +304,28 @@ jobs:
             echo "No unexpected assets found."
           fi
 
+      - name: Remove existing assets on current tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          release_id="$(gh api "repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}" --jq '.id')"
+          echo "Release ID: ${release_id}"
+
+          mapfile -t assets < <(gh api "repos/${{ github.repository }}/releases/${release_id}/assets" --jq '.[] | "\(.id)\t\(.name)"')
+          if [ "${#assets[@]}" -eq 0 ]; then
+            echo "No existing assets to delete."
+            exit 0
+          fi
+
+          for asset in "${assets[@]}"; do
+            asset_id="${asset%%$'\t'*}"
+            asset_name="${asset#*$'\t'}"
+            echo "Delete existing asset: ${asset_name}"
+            gh api -X DELETE "repos/${{ github.repository }}/releases/assets/${asset_id}"
+          done
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
