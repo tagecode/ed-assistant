@@ -310,7 +310,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          release_id="$(gh api "repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}" --jq '.id')"
+          release_id="$(gh api "repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}" --jq '.id' 2>/dev/null || true)"
+          if [ -z "${release_id}" ]; then
+            echo "No existing release found for tag ${{ github.ref_name }}, skip asset cleanup."
+            exit 0
+          fi
           echo "Release ID: ${release_id}"
 
           mapfile -t assets < <(gh api "repos/${{ github.repository }}/releases/${release_id}/assets" --jq '.[] | "\(.id)\t\(.name)"')
