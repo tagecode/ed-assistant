@@ -36,7 +36,7 @@ function createMainWindow() {
     minWidth: 1040,
     minHeight: 720,
     title: 'ED Assistant',
-    autoHideMenuBar: false,
+    autoHideMenuBar: process.platform !== 'darwin',
     show: false,
     backgroundColor: '#050815',
     webPreferences: {
@@ -45,6 +45,11 @@ function createMainWindow() {
       nodeIntegration: false,
     },
   })
+
+  // Keep native app menu behavior on macOS, hide window menu on Windows/Linux.
+  if (process.platform !== 'darwin') {
+    window.setMenu(null)
+  }
 
   if (process.env.VITE_DEV_SERVER_URL) {
     void window.loadURL(process.env.VITE_DEV_SERVER_URL)
