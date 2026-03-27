@@ -157,7 +157,7 @@ jobs:
             }
           }
 
-          # 2) 若出现重复安装器（例如带空格的文件名版本），保留“不含空格”的那个
+          # 2) 若出现重复安装器（例如带空格的文件名版本），保留"不含空格"的那个
           $installerExes = Get-ChildItem -Path 'release' -File -Filter '*.exe' | Where-Object {
             $_.Name -notlike 'age*.exe' -and $_.Name -ine 'elevate.exe'
           }
@@ -250,24 +250,31 @@ jobs:
       - name: Merge SHA256SUMS from all platforms
         run: |
           mkdir -p dist-upload
-          # 收集所有安装包到同一目录
-          shopt -s nullglob
-          shopt -s nocasematch
-          for f in artifacts/*/release/*.dmg artifacts/*/release/*.zip artifacts/*/release/*.exe artifacts/*/release/*.AppImage artifacts/*/release/*.deb; do
+          # upload-artifact v4+ 会 strip 公共路径前缀（release/），
+          # 所以 artifact 内文件直接位于 artifacts/<name>/ 下，不含 release/ 层。
+          shopt -s nullglob nocasematch
+          for f in artifacts/*/*.dmg artifacts/*/*.zip artifacts/*/*.exe artifacts/*/*.AppImage artifacts/*/*.deb; do
             base="$(basename "$f")"
-            # 防止把“应用内部资源里的 age.exe”等误当成安装包附件上传
+            # 防止把应用内部资源里的 age.exe 等误当成安装包附件上传
             if [[ "$base" == age*.exe || "$base" == "elevate.exe" ]]; then
               echo "Skip internal binary in Release: $base"
               continue
             fi
+            echo "Collect: $base"
             cp "$f" dist-upload/
           done
 
-          # 重新基于实际安装包文件计算 SHA256，避免出现空的 SHA256SUMS.txt
+          # 用 find + xargs --no-run-if-empty 计算 SHA256，
+          # 避免 nullglob 展开为空时 sha256sum 读 stdin 写出假哈希。
           cd dist-upload
           rm -f SHA256SUMS.txt
-          # sha256sum 在有匹配文件时才会生成内容；nullglob 确保没匹配也不会误报
-          sha256sum ./*.dmg ./*.zip ./*.exe ./*.AppImage ./*.deb 2>/dev/null > SHA256SUMS.txt || true
+          find . -maxdepth 1 -type f \( \
+            -name "*.dmg" -o -name "*.zip" -o -name "*.exe" \
+            -o -name "*.AppImage" -o -name "*.deb" \
+          \) -print0 \
+            | sort -z \
+            | xargs -0 --no-run-if-empty sha256sum \
+            > SHA256SUMS.txt
           if [ ! -s SHA256SUMS.txt ]; then
             echo "SHA256SUMS.txt is empty (no installers found)."
             exit 1
