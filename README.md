@@ -11,7 +11,7 @@
 
 ED Assistant 基于 **Electron + Vite + React + TypeScript + Tailwind CSS + shadcn/ui** 构建，将 age 预编译二进制（含 `age-plugin-batchpass` 密码模式插件）随应用打包，在主进程中通过子进程调用，不向渲染进程暴露敏感能力。
 
-当前版本 **v0.1.0**，已实现密码生成、口令/公钥加密与解密、X25519 密钥对生成、主题与设置等核心功能。更多规划见 [PRD.md](./PRD.md)。
+当前版本 **v0.1.2**，已实现密码生成、口令/公钥加密与解密、X25519 密钥对生成、主题与设置等核心功能。更多规划见 [PRD.md](./PRD.md)。
 
 ---
 
